@@ -4,7 +4,7 @@ Arduino-based audiobook player with a focus on simplicity
 
 * When powered on, plays the recently played track
 * When SD card inserted, plays the recently played track
-* When next button is pressed (or sensor is actuated), plays the track after the recently played track
+* When next button is pressed (or clap sensor is actuated), plays the track after the recently played track
 * Whenever a different track is played, that track is saved to EEPROM as the recently played track (with wear leveling to greatly incrase the lifespan of the EEPROM)
 
 Possible future extensions:
@@ -36,6 +36,6 @@ To upload to the bare chip, I am not using a serial programmer, but upload direc
 * 3D printed housing, e.g., variation of "3D printed transmission line" - is it worth the effort? Does the speaker need to be glued in? https://www.instructables.com/id/3D-Printed-Transmission-Line-Speaker/
 * Breadboard (2 EUR)
 * Wires
-* Clap sensor or other interesting sensor in addition to a play button?
+* Clap sensor (or other interesting sensor in addition to a play button)
 
 Note: An ATTiny might possibly do as shown by https://github.com/accidentalrebel/abplayer-mini but in my test with an ATTiny45 flash storage was too small to use the EEPROMWearLevel library, and the lack of a hardware serial port complicates debugging.
