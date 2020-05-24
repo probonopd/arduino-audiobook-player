@@ -18,6 +18,12 @@
 #define AMOUNT_OF_INDEXES 2
 #define INDEX_CONFIGURATION_VAR1 0
 
+// Clap sensor
+#define CLAPIN  2 // pin must be interrupt-capable
+#define CLAP_DELAY 1000 // min gap between claps to trigger
+volatile boolean clap = false; // clap detected state - "volatile" means that ISR writes it
+unsigned long clap_time, last_clap_time = 0; // clap time records
+
 // Advance declaration so that we can refer to the function
 // before we define it
 void play();
@@ -80,6 +86,12 @@ unsigned long previousMillis = 0;
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(CLAPIN, INPUT_PULLUP);
+  attachInterrupt(                  // register Interrupt Service Routine (ISR):
+    digitalPinToInterrupt(CLAPIN),  //   pin to watch for interrupt
+    heard_clap,                     //   void function to call on interrupt
+    FALLING                         //   trigger interrupt on HIGH → LOW change
+  );
   EEPROMwl.begin(EEPROM_LAYOUT_VERSION, AMOUNT_OF_INDEXES);
   Serial.begin(9600); // For debugging with
   mp3.begin();
@@ -94,7 +106,18 @@ void setup()
 
 void loop()
 {
+  if (clap) { // we heard a clap from ISR
+    clap = false; // make sure we don't trigger again too soon
+    last_clap_time = clap_time; // store old clap time
+    clap_time = millis(); // note current clap time
+    if (clap_time - last_clap_time > CLAP_DELAY) { // if the last clap was some time ago:
+      Serial.println("Clap!"); //   notify
+      mp3.nextTrack();
+    }
+  }
+
   mp3.loop();
+  
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
@@ -104,11 +127,9 @@ void loop()
 }
 
 void play() {
-
   EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track);
   Serial.print("EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track); ");
   Serial.println(track);
-
   // FILES ON SD NEED TO BE IN THIS FORMAT: 01/0001_Something.mp3
   mp3.playFolderTrack16(1, track);
 }
@@ -132,4 +153,8 @@ void askPlayerForTrack() {
       delay(100);
     }
   }
+}
+
+void heard_clap() {
+  clap = true; // just set clap state in ISR and leave as soon as possible
 }
