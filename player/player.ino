@@ -5,18 +5,74 @@
 // Core and chip pinout: https://github.com/MCUdude/MiniCore
 // Not using a serial programmer, uploading directly using USBASP with Ctrl-Shift-U
 // Permissions: sudo chmod 666 /dev/bus/usb/*/*
-// Most likely a smaller ATMega or even ATTiny might do
-// Library: https://github.com/PowerBroker2/DFPlayerMini_Fast
+// An ATTiny would also do (with another core)
+// Files must be in:
+// 01/0001_SomeOptionalTitle.mp3
 
 #include <SoftwareSerial.h>
-#include <DFPlayerMini_Fast.h>
-#include <EEPROM.h>
-#include <avr/sleep.h>
+#include <DFMiniMp3.h>
+#include <EEPROMWearLevel.h>
 
-SoftwareSerial mySerial(10, 11); // RX, TX
-DFPlayerMini_Fast myMP3;
+// See https://github.com/PRosenb/EEPROMWearLevel
+#define EEPROM_LAYOUT_VERSION 0
+#define AMOUNT_OF_INDEXES 2
+#define INDEX_CONFIGURATION_VAR1 0
 
-int addrOfTrack = 0;
+// Advance declaration so that we can refer to the function
+// before we define it
+void play();
+
+// Callback class, its member methods will get called
+class Mp3Notify
+{
+  public:
+    static void PrintlnSourceAction(DfMp3_PlaySources source, const char* action)
+    {
+      if (source & DfMp3_PlaySources_Sd)
+      {
+        Serial.print("SD Card, ");
+      }
+      if (source & DfMp3_PlaySources_Usb)
+      {
+        Serial.print("USB Disk, ");
+      }
+      if (source & DfMp3_PlaySources_Flash)
+      {
+        Serial.print("Flash, ");
+      }
+      Serial.println(action);
+    }
+    static void OnError(uint16_t errorCode)
+    {
+      Serial.println();
+      Serial.print("Com Error, see DfMp3_Error for code meaning: ");
+      Serial.println(errorCode);
+    }
+    static void OnPlayFinished(DfMp3_PlaySources source, uint16_t track)
+    {
+      Serial.print("Play finished for #");
+      Serial.println(track);
+    }
+    static void OnPlaySourceOnline(DfMp3_PlaySources source)
+    {
+      PrintlnSourceAction(source, "online");
+      play();
+    }
+    static void OnPlaySourceInserted(DfMp3_PlaySources source)
+    {
+      PrintlnSourceAction(source, "inserted");
+      play();
+    }
+    static void OnPlaySourceRemoved(DfMp3_PlaySources source)
+    {
+      PrintlnSourceAction(source, "removed");
+    }
+};
+
+// Instantiate a DFMiniMp3 object
+SoftwareSerial secondarySerial(10, 11); // RX, TX
+DFMiniMp3<SoftwareSerial, Mp3Notify> mp3(secondarySerial);
+
 int16_t track;
 const long interval = 5000; // interval at which to ask the player for the current track (milliseconds)
 unsigned long previousMillis = 0;
@@ -24,9 +80,10 @@ unsigned long previousMillis = 0;
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
+  EEPROMwl.begin(EEPROM_LAYOUT_VERSION, AMOUNT_OF_INDEXES);
+  Serial.begin(9600); // For debugging with
+  mp3.begin();
 
-  mySerial.begin(9600);
-  myMP3.begin(mySerial);
   digitalWrite(LED_BUILTIN, HIGH);
   delay(1000);
   digitalWrite(LED_BUILTIN, LOW);
@@ -37,6 +94,7 @@ void setup()
 
 void loop()
 {
+  mp3.loop();
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
@@ -47,29 +105,31 @@ void loop()
 
 void play() {
 
-  track = EEPROM.read(addrOfTrack);
-  // Reset track number to sensible value
-  // if (track > myMP3.numUsbTracks() ) {
-  //  track  = 0;
-  // }
+  EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track);
+  Serial.print("EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track); ");
+  Serial.println(track);
 
-  // TO BE DEBUGGED: WE HAVE AN ISSUE WHEN THE FIRST TRACK IS SELECTED.
-  // WHY? DO FILES ON SD NEED TO START WITH mp3/0000.mp3?
-
-  myMP3.playFromMP3Folder(track + 1);
+  // FILES ON SD NEED TO BE IN THIS FORMAT: 01/0001_Something.mp3
+  mp3.playFolderTrack16(1, track);
 }
 
 
 void askPlayerForTrack() {
   int16_t current_track;
-  current_track = myMP3.currentSdTrack();
-  track = EEPROM.read(addrOfTrack);
+  current_track = mp3.getCurrentTrack(DfMp3_PlaySource_Sd);
+  EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track);
   // If the player answered with anoth track than the last one we knew, save it and blink short
   if (current_track != track) {
-    EEPROM.write(addrOfTrack, current_track);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(100);
+    Serial.print("mp3.getCurrentTrack(DfMp3_PlaySource_Sd): ");
+    Serial.println(current_track);
+    // Currently playing track is 0 if no card is inserted, let's not save that!
+    if (current_track > 0) {
+      Serial.println("Saving to EEPROM");
+      EEPROMwl.put(INDEX_CONFIGURATION_VAR1, current_track);
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(100);
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(100);
+    }
   }
 }
