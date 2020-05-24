@@ -15,7 +15,7 @@ Possible future extensions:
 * Switch between multiple audiobooks
 * Set the MP3 module into energy saving mode and wake it up again
 * Set the ATmega into energy saving mode and wake it up again
-* 3D printed enclosure "Transmission line" https://www.youtube.com/watch?v=uujaBjf3Uwg
+* 3D printed enclosure waevguide/"Transmission line" https://www.youtube.com/watch?v=uujaBjf3Uwg (Also see http://www.mh-audio.nl/Calculators/TML.html)
 
 ## Software
 
