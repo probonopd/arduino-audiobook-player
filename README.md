@@ -2,6 +2,21 @@
 
 Arduino-based audiobook player with a focus on simplicity
 
+* When powered on, plays the recently played track
+* When SD card inserted, plays the recently played track
+* When next button is pressed (or sensor is actuated), plays the track after the recently played track
+* Whenever a different track is played, that track is saved to EEPROM as the recently played track (with wear leveling to greatly incrase the lifespan of the EEPROM)
+
+Possible future extensions:
+
+* Smart sleep detection with last track repeat: If the listener has fallen asleep, then pressing the button should not play the next track but the recently played track (again)
+* Distinguish between short press, long press, and double press
+* Possibly IR remote control (but this waters down the concept of simplicity)
+* Switch between multiple audiobooks
+* Set the MP3 module into energy saving mode and wake it up again
+* Set the ATmega into energy saving mode and wake it up again
+* 3D printed enclosure "Transmission line" https://www.youtube.com/watch?v=uujaBjf3Uwg
+
 ## Software
 
 Libraries
