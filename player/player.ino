@@ -9,6 +9,11 @@
 // Files must be in:
 // 01/0001_SomeOptionalTitle.mp3
 
+#include <Arduino.h>
+#include <DebounceEvent.h>
+
+#define BUTTON_PIN          4
+
 #include <SoftwareSerial.h>
 #include <DFMiniMp3.h>
 #include <EEPROMWearLevel.h>
@@ -18,15 +23,17 @@
 #define AMOUNT_OF_INDEXES 2
 #define INDEX_CONFIGURATION_VAR1 0
 
-// Clap sensor
-#define CLAPIN  2 // pin must be interrupt-capable
-#define CLAP_DELAY 1000 // min gap between claps to trigger
-volatile boolean clap = false; // clap detected state - "volatile" means that ISR writes it
-unsigned long clap_time, last_clap_time = 0; // clap time records
-
 // Advance declaration so that we can refer to the function
 // before we define it
 void play();
+
+// We keep track of the time at which the last track finished playing
+// Only if the button is pressed within a certain amount of time after this,
+// we increment the track.
+// Otherwise the listener may have fallen asleep duing the last track and may
+// hence want to hear the last track again.
+unsigned long millisWhenLastTrackStartedOrFinished = 0;
+unsigned long sleepThresholdMillis = 60000; // 1 minute
 
 // Callback class, its member methods will get called
 class Mp3Notify
@@ -58,6 +65,7 @@ class Mp3Notify
     {
       Serial.print("Play finished for #");
       Serial.println(track);
+      millisWhenLastTrackStartedOrFinished = millis();
     }
     static void OnPlaySourceOnline(DfMp3_PlaySources source)
     {
@@ -79,19 +87,45 @@ class Mp3Notify
 SoftwareSerial secondarySerial(10, 11); // RX, TX
 DFMiniMp3<SoftwareSerial, Mp3Notify> mp3(secondarySerial);
 
-int16_t track;
-const long interval = 5000; // interval at which to ask the player for the current track (milliseconds)
-unsigned long previousMillis = 0;
+uint16_t track;
+
+// This callback function is called when the button is clicked
+void callback(uint8_t pin, uint8_t event, uint8_t count, uint16_t length) {
+  if(length > 0) {
+    Serial.print("Event : "); Serial.print(event);
+    Serial.print(" Count : "); Serial.print(count);
+    Serial.print(" Length: "); Serial.print(length);
+    Serial.println();
+
+    if(count==1 && length<500){
+      Serial.println("Single click detected: Play");
+      if (millis() - millisWhenLastTrackStartedOrFinished < sleepThresholdMillis ) {
+        saveTrack(track+1);
+      }
+      play();
+    }
+
+    if(count==2 && length<500){
+      Serial.println("Double click detected: last");
+      saveTrack(track-1);
+      play();
+    }
+
+    if(count==7 && length>5000){
+      Serial.println("7 clicks detected the last of which is >5 sec: Reset to track 1");
+      saveTrack(1);
+      play();
+    }
+
+  }
+}
+
+DebounceEvent button = DebounceEvent(BUTTON_PIN, callback, BUTTON_PUSHBUTTON | BUTTON_DEFAULT_HIGH | BUTTON_SET_PULLUP);
 
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(CLAPIN, INPUT_PULLUP);
-  attachInterrupt(                  // register Interrupt Service Routine (ISR):
-    digitalPinToInterrupt(CLAPIN),  //   pin to watch for interrupt
-    heard_clap,                     //   void function to call on interrupt
-    FALLING                         //   trigger interrupt on HIGH → LOW change
-  );
+
   EEPROMwl.begin(EEPROM_LAYOUT_VERSION, AMOUNT_OF_INDEXES);
   Serial.begin(9600); // For debugging with
   mp3.begin();
@@ -100,61 +134,35 @@ void setup()
   delay(1000);
   digitalWrite(LED_BUILTIN, LOW);
   delay(100);
-  // myMP3.volume(20);
+  mp3.setVolume(22); // Set default volume
   play(); // This is non-blocking
 }
 
 void loop()
 {
-  if (clap) { // we heard a clap from ISR
-    clap = false; // make sure we don't trigger again too soon
-    last_clap_time = clap_time; // store old clap time
-    clap_time = millis(); // note current clap time
-    if (clap_time - last_clap_time > CLAP_DELAY) { // if the last clap was some time ago:
-      Serial.println("Clap!"); //   notify
-      mp3.nextTrack();
-    }
-  }
-
   mp3.loop();
-  
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    askPlayerForTrack();
-
-  }
+  button.loop();
 }
 
 void play() {
+  millisWhenLastTrackStartedOrFinished = millis();
   EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track);
-  Serial.print("EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track); ");
+  Serial.print("Track from EEPROM: ");
   Serial.println(track);
   // FILES ON SD NEED TO BE IN THIS FORMAT: 01/0001_Something.mp3
   mp3.playFolderTrack16(1, track);
 }
 
 
-void askPlayerForTrack() {
-  int16_t current_track;
-  current_track = mp3.getCurrentTrack(DfMp3_PlaySource_Sd);
-  EEPROMwl.get(INDEX_CONFIGURATION_VAR1, track);
-  // If the player answered with anoth track than the last one we knew, save it and blink short
-  if (current_track != track) {
-    Serial.print("mp3.getCurrentTrack(DfMp3_PlaySource_Sd): ");
-    Serial.println(current_track);
-    // Currently playing track is 0 if no card is inserted, let's not save that!
-    if (current_track > 0) {
+void saveTrack(int newTrack) {
+{
       Serial.println("Saving to EEPROM");
-      EEPROMwl.put(INDEX_CONFIGURATION_VAR1, current_track);
+      EEPROMwl.put(INDEX_CONFIGURATION_VAR1, newTrack);
       digitalWrite(LED_BUILTIN, HIGH);
       delay(100);
       digitalWrite(LED_BUILTIN, LOW);
       delay(100);
-    }
+    
   }
 }
 
-void heard_clap() {
-  clap = true; // just set clap state in ISR and leave as soon as possible
-}
