@@ -32,8 +32,8 @@ void play();
 // we increment the track.
 // Otherwise the listener may have fallen asleep duing the last track and may
 // hence want to hear the last track again.
-unsigned long millisWhenLastTrackStartedOrFinished = 0;
 unsigned long sleepThresholdMillis = 60000; // 1 minute
+unsigned long millisWhenLastTrackStartedOrFinished = sleepThresholdMillis+1 ;
 
 // Callback class, its member methods will get called
 class Mp3Notify
@@ -103,6 +103,11 @@ void callback(uint8_t pin, uint8_t event, uint8_t count, uint16_t length) {
         saveTrack(track+1);
       }
       play();
+    }
+
+    if(count==1 && length>500){
+      Serial.println("Single long press detected: Stop");
+      mp3.stop();
     }
 
     if(count==2 && length<500){
