@@ -24,6 +24,7 @@ Possible future extensions:
 Libraries
 * https://github.com/PRosenb/EEPROMWearLevel
 * https://github.com/Makuna/DFMiniMp3
+* https://github.com/xoseperez/debounceevent
 
 ## Hardware
 
@@ -41,3 +42,7 @@ To upload to the bare chip, I am not using a serial programmer, but upload direc
 * Clap sensor (or other interesting sensor in addition to a play button)
 
 Note: An ATTiny might possibly do as shown by https://github.com/accidentalrebel/abplayer-mini but in my test with an ATTiny45 flash storage was too small to use the EEPROMWearLevel library, and the lack of a hardware serial port complicates debugging.
+
+## Design inspiration
+
+* Dieter Rams
