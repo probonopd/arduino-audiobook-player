@@ -108,6 +108,7 @@ void callback(uint8_t pin, uint8_t event, uint8_t count, uint16_t length) {
     if(count==1 && length>500){
       Serial.println("Single long press detected: Stop");
       mp3.stop();
+      millisWhenLastTrackStartedOrFinished = sleepThresholdMillis+1; // When we stopped using this, we want to play the same track again next time
     }
 
     if(count==2 && length<500){
