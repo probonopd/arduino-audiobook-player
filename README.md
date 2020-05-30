@@ -2,6 +2,8 @@
 
 Arduino-based audiobook player with a focus on simplicity
 
+![](https://user-images.githubusercontent.com/2480569/83334085-9ca25d00-a293-11ea-98e4-79034273763c.jpg)
+
 * When powered on, plays the recently played track
 * When SD card inserted, plays the recently played track
 * When next button is pressed (or clap sensor is actuated), plays the track after the recently played track
